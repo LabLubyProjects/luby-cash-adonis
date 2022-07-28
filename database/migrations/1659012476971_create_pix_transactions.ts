@@ -20,6 +20,7 @@ export default class extends BaseSchema {
         .notNullable()
         .onDelete('CASCADE')
         .onUpdate('CASCADE')
+      table.decimal('value').notNullable()
       table.timestamp('created_at', { useTz: true })
     })
   }
