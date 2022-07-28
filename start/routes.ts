@@ -1,5 +1,6 @@
 import Route from '@ioc:Adonis/Core/Route'
 
-Route.get('/', async () => {
-  return { hello: 'world' }
-})
+Route.where('id', Route.matchers.uuid())
+
+// API VERSION 1.0
+Route.group(() => {}).prefix('api/v1')
