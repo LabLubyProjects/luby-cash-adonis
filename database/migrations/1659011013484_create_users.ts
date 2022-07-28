@@ -12,7 +12,6 @@ export default class extends BaseSchema {
         .uuid('status')
         .references('id')
         .inTable('status')
-        .notNullable()
         .onDelete('CASCADE')
         .onUpdate('CASCADE')
       table.string('email', 50).unique().notNullable()
