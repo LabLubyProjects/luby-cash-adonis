@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon'
-import { BaseModel, column } from '@ioc:Adonis/Lucid/Orm'
+import { BaseModel, beforeCreate, column } from '@ioc:Adonis/Lucid/Orm'
+import * as crypto from 'crypto'
 
 export default class Status extends BaseModel {
   @column({ isPrimary: true })
@@ -13,4 +14,9 @@ export default class Status extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   public updatedAt: DateTime
+
+  @beforeCreate()
+  public static assignUuid(status: Status) {
+    status.id = crypto.randomUUID()
+  }
 }

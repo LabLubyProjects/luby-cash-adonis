@@ -1,8 +1,13 @@
 import { DateTime } from 'luxon'
 import { BaseModel, BelongsTo, belongsTo, column } from '@ioc:Adonis/Lucid/Orm'
+import { compose } from '@ioc:Adonis/Core/Helpers'
 import User from './User'
+import { Filterable } from '@ioc:Adonis/Addons/LucidFilter'
+import PixTransactionFilter from './Filters/PixTransactionFilter'
 
-export default class PixTransaction extends BaseModel {
+export default class PixTransaction extends compose(BaseModel, Filterable) {
+  public static $filter = () => PixTransactionFilter
+
   @column({ isPrimary: true })
   public id: string
 
