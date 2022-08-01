@@ -57,14 +57,32 @@ export default class UsersController {
       'fullName',
       'cpfNumber',
       'email',
+      'password',
       'phone',
       'averageSalary',
       'city',
       'state',
       'zipcode',
     ])
+    clientBody.state = clientBody.state.toUpperCase()
+    const transaction = await Database.transaction()
+
+    let newClient = new User()
+    try {
+      newClient.useTransaction(transaction)
+      newClient.merge(clientBody)
+      const clientRole = await Role.findByOrFail('name', 'client')
+      await newClient.related('roles').attach([clientRole.id], transaction)
+      await newClient.save()
+    } catch (error) {
+      await transaction.rollback()
+      return response.badRequest({ message: 'Error creating client' })
+    }
+
+    await transaction.commit()
 
     await produce(clientBody, 'store-client')
+    return response.ok({ message: 'You will receive an email informing about your situation' })
   }
 
   public async updateAdmin({ request, response, params, auth }: HttpContextContract) {
