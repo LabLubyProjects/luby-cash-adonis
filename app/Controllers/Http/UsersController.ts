@@ -2,10 +2,12 @@ import type { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
 import User from '../../Models/User'
 import Database from '@ioc:Adonis/Lucid/Database'
 import Role from 'App/Models/Role'
-import { produce } from 'App/messaging/kafka'
+import { produce } from 'App/Messaging/kafka'
 import StoreAdminValidator from 'App/Validators/User/StoreAdminValidator'
 import StoreClientValidator from 'App/Validators/User/StoreClientValidator'
 import Status from 'App/Models/Status'
+import UpdateAdminValidator from 'App/Validators/User/UpdateAdminValidator'
+import UpdateClientValidator from 'App/Validators/User/UpdateClientValidator'
 
 export default class UsersController {
   public async index({ response }: HttpContextContract) {
@@ -103,6 +105,7 @@ export default class UsersController {
   }
 
   public async updateAdmin({ request, response, params, auth }: HttpContextContract) {
+    await request.validate(UpdateAdminValidator)
     const adminId = params.id
 
     if (adminId !== auth.user?.id)
@@ -115,6 +118,7 @@ export default class UsersController {
       updatedAdmin = await User.find(adminId)
       updatedAdmin.useTransaction(transaction)
       await updatedAdmin.merge(adminBody).save()
+      if (await updatedAdmin.isClient()) await produce(updatedAdmin, 'update-client')
     } catch (error) {
       await transaction.rollback()
       return response.badRequest({ message: 'Error updating admin' })
@@ -136,7 +140,51 @@ export default class UsersController {
     return response.ok(adminFind)
   }
 
-  public async updateClient({ request, response, params }: HttpContextContract) {}
+  public async updateClient({ request, response, params, auth }: HttpContextContract) {
+    await request.validate(UpdateClientValidator)
+    const clientId = params.id
+    if (clientId !== auth.user?.id && !(await auth.user?.isAdmin()))
+      return response.forbidden({ message: 'You are not allowed to update this client' })
+
+    const clientBody = request.only([
+      'fullName',
+      'cpfNumber',
+      'email',
+      'password',
+      'phone',
+      'averageSalary',
+      'city',
+      'state',
+      'zipcode',
+      'status',
+    ])
+
+    await produce({ id: clientId, ...clientBody }, 'update-client')
+
+    let updatedClient
+
+    const transaction = await Database.transaction()
+
+    try {
+      updatedClient = await User.find(clientId)
+      updatedClient.useTransaction(transaction)
+      await updatedClient.merge(clientBody).save()
+      // if(clientBody.status)
+      // await updatedClient.related('status').attach([pendingStatus.id], transaction)
+    } catch (error) {
+      await transaction.rollback()
+      return response.badRequest({ statusCode: 400, message: 'Error updating client' })
+    }
+    await transaction.commit()
+    let clientFind
+    try {
+      clientFind = await User.find(clientId)
+    } catch (error) {
+      return response.notFound({ statusCode: 404, message: 'Error finding client' })
+    }
+
+    return response.ok(clientFind)
+  }
 
   public async destroy({ params, response }: HttpContextContract) {
     const userId = params.id

@@ -5,6 +5,7 @@ import * as crypto from 'crypto'
 import { DateTime } from 'luxon'
 import ForgotPasswordValidator from 'App/Validators/User/ForgotPasswordValidator'
 import ResetPasswordValidator from 'App/Validators/User/ResetPasswordValidator'
+import { produce } from 'App/Messaging/kafka'
 
 export default class AuthController {
   public async login({ auth, request, response }: HttpContextContract) {
@@ -39,11 +40,10 @@ export default class AuthController {
       user.passwordRecoverToken = token
       user.passwordRecoverTokenExpiration = tokenExpiration
       await user.save()
-      // Send recover email
-      // await produce(
-      //   { ...user.serialize(), passwordRecoverToken: user.passwordRecoverToken },
-      //   'forgot-password'
-      // )
+      await produce(
+        { ...user.serialize(), passwordRecoverToken: user.passwordRecoverToken },
+        'forgot-password'
+      )
 
       return response.ok({
         message: 'We have sent you and recovery token. Keep your eyes on your mailbox',
