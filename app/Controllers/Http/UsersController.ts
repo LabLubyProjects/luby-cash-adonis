@@ -2,6 +2,7 @@ import type { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
 import User from '../../Models/User'
 import Database from '@ioc:Adonis/Lucid/Database'
 import Role from 'App/Models/Role'
+import { produce } from 'App/messaging/kafka'
 
 export default class UsersController {
   public async index({ response }: HttpContextContract) {
@@ -63,7 +64,7 @@ export default class UsersController {
       'zipcode',
     ])
 
-    //send to MS
+    await produce(clientBody, 'store-client')
   }
 
   public async updateAdmin({ request, response, params, auth }: HttpContextContract) {
