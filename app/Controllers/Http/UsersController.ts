@@ -88,8 +88,8 @@ export default class UsersController {
     try {
       newClient.useTransaction(transaction)
       newClient.merge(clientBody)
-      const pedingStatus = await Status.findByOrFail('value', 'pending')
-      //await newClient.related('status').attach([pedingStatus.id], transaction)
+      const pendingStatus = await Status.findByOrFail('value', 'pending')
+      //await newClient.related('status').attach([pendingStatus.id], transaction)
       await newClient.save()
     } catch (error) {
       await transaction.rollback()
@@ -135,6 +135,8 @@ export default class UsersController {
 
     return response.ok(adminFind)
   }
+
+  public async updateClient({ request, response, params }: HttpContextContract) {}
 
   public async destroy({ params, response }: HttpContextContract) {
     const userId = params.id

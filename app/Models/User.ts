@@ -42,7 +42,7 @@ export default class User extends compose(BaseModel, Filterable) {
   public passwordRecoverToken?: string
 
   @column({ serializeAs: null })
-  public passwordRecoverTokenExpiration?: string
+  public passwordRecoverTokenExpiration?: DateTime
 
   @column.dateTime({ autoCreate: true })
   public createdAt: DateTime
