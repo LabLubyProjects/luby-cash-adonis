@@ -3,6 +3,9 @@ import User from '../../Models/User'
 import Database from '@ioc:Adonis/Lucid/Database'
 import Role from 'App/Models/Role'
 import { produce } from 'App/messaging/kafka'
+import StoreAdminValidator from 'App/Validators/User/StoreAdminValidator'
+import StoreClientValidator from 'App/Validators/User/StoreClientValidator'
+import Status from 'App/Models/Status'
 
 export default class UsersController {
   public async index({ response }: HttpContextContract) {
@@ -21,6 +24,7 @@ export default class UsersController {
   }
 
   public async storeAdmin({ request, response }: HttpContextContract) {
+    await request.validate(StoreAdminValidator)
     const adminBody = request.only(['fullName', 'cpfNumber', 'email', 'password'])
     const transaction = await Database.transaction()
 
@@ -53,7 +57,9 @@ export default class UsersController {
   }
 
   public async storeClient({ request, response }: HttpContextContract) {
+    await request.validate(StoreClientValidator)
     const clientBody = request.only([
+      'id',
       'fullName',
       'cpfNumber',
       'email',
@@ -64,6 +70,17 @@ export default class UsersController {
       'state',
       'zipcode',
     ])
+
+    const userByCpf = await User.find(clientBody.id)
+
+    if (userByCpf && (await userByCpf.isClient()))
+      return response.unprocessableEntity({ message: 'Already a client' })
+
+    if (userByCpf && (await userByCpf.isDisapproved()))
+      return response.badRequest({
+        message: 'Unfortunately you are not eligible to be a client',
+      })
+
     clientBody.state = clientBody.state.toUpperCase()
     const transaction = await Database.transaction()
 
@@ -71,8 +88,8 @@ export default class UsersController {
     try {
       newClient.useTransaction(transaction)
       newClient.merge(clientBody)
-      const clientRole = await Role.findByOrFail('name', 'client')
-      await newClient.related('roles').attach([clientRole.id], transaction)
+      const pedingStatus = await Status.findByOrFail('value', 'pending')
+      //await newClient.related('status').attach([pedingStatus.id], transaction)
       await newClient.save()
     } catch (error) {
       await transaction.rollback()
@@ -124,6 +141,8 @@ export default class UsersController {
     const user = await User.find(userId)
 
     if (!user) return response.notFound({ message: 'User not found' })
+
+    if (await user.isClient()) await produce({ clientId: userId }, 'delete-client')
 
     await user.delete()
     return response.ok(user)

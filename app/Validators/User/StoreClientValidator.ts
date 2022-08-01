@@ -6,6 +6,11 @@ export default class StoreClientValidator extends CustomMessages {
   constructor(protected ctx: HttpContextContract) {
     super()
   }
+
+  public refs = schema.refs({
+    id: this.ctx.params.id,
+  })
+
   public schema = schema.create({
     fullName: schema.string({ trim: true }, [
       rules.maxLength(50),
@@ -14,13 +19,25 @@ export default class StoreClientValidator extends CustomMessages {
     ]),
     cpfNumber: schema.string({}, [
       rules.regex(/^\d{3}.\d{3}.\d{3}-\d{2}$/),
-      rules.unique({ table: 'users', column: 'cpf_number' }),
+      rules.unique({
+        table: 'users',
+        column: 'cpf_number',
+        whereNot: {
+          id: this.refs.id,
+        },
+      }),
     ]),
     email: schema.string({ trim: true }, [
       rules.maxLength(50),
       rules.minLength(3),
       rules.email(),
-      rules.unique({ table: 'users', column: 'email' }),
+      rules.unique({
+        table: 'users',
+        column: 'email',
+        whereNot: {
+          id: this.refs.id,
+        },
+      }),
     ]),
     password: schema.string({}, [rules.maxLength(50)]),
     phone: schema.string({ trim: true }, [

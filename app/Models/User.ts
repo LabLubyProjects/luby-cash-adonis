@@ -69,4 +69,14 @@ export default class User extends compose(BaseModel, Filterable) {
     const userWithRoles = await User.query().where('id', this.id).preload('roles').first()
     return userWithRoles?.roles.some((role) => role.name === 'admin')
   }
+
+  public async isClient() {
+    const userWithRoles = await User.query().where('id', this.id).preload('roles').first()
+    return userWithRoles?.roles.some((role) => role.name === 'client')
+  }
+
+  public async isDisapproved() {
+    const userWithStatus = await User.query().where('id', this.id).preload('status').first()
+    return userWithStatus?.status.value === 'disapproved'
+  }
 }
