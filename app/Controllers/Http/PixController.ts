@@ -6,7 +6,37 @@ import PixTransaction from 'App/Models/PixTransaction'
 import { produce } from 'App/Messaging/kafka'
 
 export default class PixController {
-  public async index({}: HttpContextContract) {}
+  public async statement({ params, response, request, auth }: HttpContextContract) {
+    const clientId = params.id
+
+    if (auth.user?.id !== clientId && !(await auth.user?.isAdmin()))
+      return response.forbidden({ message: 'You are not allowed to view this bank statement' })
+
+    const { page, perPage, ...inputs } = request.qs()
+
+    try {
+      if (page || perPage) {
+        const pixTransactions = await PixTransaction.query()
+          .where('source_user_id', clientId)
+          .orWhere('target_user_id', clientId)
+          .orderBy('created_at', 'desc')
+          .filter(inputs)
+          .paginate(page || 1, perPage || 10)
+
+        return response.ok(pixTransactions)
+      }
+
+      const pixTransactions = await PixTransaction.query()
+        .where('source_user_id', clientId)
+        .orWhere('target_user_id', clientId)
+        .orderBy('created_at', 'desc')
+        .filter(inputs)
+
+      return response.ok(pixTransactions)
+    } catch (error) {
+      return response.badRequest({ statusCode: 400, message: 'Error fetching bank statement' })
+    }
+  }
 
   public async store({ request, response, auth }: HttpContextContract) {
     const sourceUserId = auth.user?.id
@@ -53,9 +83,16 @@ export default class PixController {
           sourceUserName: auth.user?.fullName,
           sourceUserEmail: auth.user?.email,
           targetUserName: targetUser.fullName,
+        },
+        'new-pix-sent'
+      )
+      await produce(
+        {
+          sourceUserName: auth.user?.fullName,
+          targetUserName: targetUser.fullName,
           targetUserEmail: targetUser.email,
         },
-        'new-pix-transaction'
+        'new-pix-received'
       )
     } catch (error) {
       return response.badRequest({ message: 'Failed performing transaction' })
@@ -63,5 +100,12 @@ export default class PixController {
     return response.created({ message: 'Transaction performed successfully' })
   }
 
-  public async show({}: HttpContextContract) {}
+  public async show({ params, response }: HttpContextContract) {
+    const pixTransactionId = params.id
+    const pixTransaction = await PixTransaction.find(pixTransactionId)
+
+    if (!pixTransaction) return response.notFound({ message: 'Pix transaction not found' })
+
+    return response.ok(pixTransaction)
+  }
 }
