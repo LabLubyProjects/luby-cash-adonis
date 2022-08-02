@@ -24,7 +24,7 @@ export default class AuthController {
     }
   }
 
-  public async forgot_password({ request, response }: HttpContextContract) {
+  public async forgotPassword({ request, response }: HttpContextContract) {
     await request.validate(ForgotPasswordValidator)
 
     const { email } = request.all()
@@ -53,7 +53,7 @@ export default class AuthController {
     }
   }
 
-  public async reset_password({ request, response }: HttpContextContract) {
+  public async resetPßassword({ request, response }: HttpContextContract) {
     await request.validate(ResetPasswordValidator)
 
     const { email, token, newPassword } = request.all()
