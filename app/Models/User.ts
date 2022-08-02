@@ -3,9 +3,9 @@ import {
   BaseModel,
   beforeCreate,
   beforeSave,
+  BelongsTo,
+  belongsTo,
   column,
-  HasOne,
-  hasOne,
   ManyToMany,
   manyToMany,
 } from '@ioc:Adonis/Lucid/Orm'
@@ -29,8 +29,11 @@ export default class User extends compose(BaseModel, Filterable) {
   @column()
   public cpfNumber: string
 
-  @hasOne(() => Status)
-  public status: HasOne<typeof Status>
+  @column()
+  public statusId: string
+
+  @belongsTo(() => Status)
+  public status: BelongsTo<typeof Status>
 
   @column()
   public email: string

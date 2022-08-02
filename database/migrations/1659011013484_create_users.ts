@@ -9,7 +9,7 @@ export default class extends BaseSchema {
       table.string('full_name', 50).notNullable()
       table.string('cpf_number', 14).unique().notNullable()
       table
-        .uuid('status')
+        .uuid('status_id')
         .references('id')
         .inTable('status')
         .onDelete('CASCADE')

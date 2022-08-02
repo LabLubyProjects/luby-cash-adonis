@@ -91,7 +91,7 @@ export default class UsersController {
       newClient.useTransaction(transaction)
       newClient.merge(clientBody)
       const pendingStatus = await Status.findByOrFail('value', 'pending')
-      //await newClient.related('status').attach([pendingStatus.id], transaction)
+      await newClient.related('status').associate(pendingStatus)
       await newClient.save()
     } catch (error) {
       await transaction.rollback()
@@ -169,8 +169,10 @@ export default class UsersController {
       updatedClient = await User.find(clientId)
       updatedClient.useTransaction(transaction)
       await updatedClient.merge(clientBody).save()
-      // if(clientBody.status)
-      // await updatedClient.related('status').attach([pendingStatus.id], transaction)
+      if (clientBody.status) {
+        const status = await Status.findBy('value', clientBody.status)
+        await updatedClient.related('status').associate(status)
+      }
     } catch (error) {
       await transaction.rollback()
       return response.badRequest({ statusCode: 400, message: 'Error updating client' })

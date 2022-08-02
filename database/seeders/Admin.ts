@@ -17,10 +17,9 @@ export default class extends BaseSeeder {
       const roleAdmin = await Role.findBy('name', 'admin')
       const roleClient = await Role.findBy('name', 'player')
       const statusApproved = await Status.findBy('value', 'approved')
-
       if (roleAdmin) await admin.related('roles').attach([roleAdmin.id])
       if (roleClient) await admin.related('roles').attach([roleClient.id])
-      if (statusApproved) await statusApproved.related('users').associate(admin)
+      if (statusApproved) await admin.related('status').associate(statusApproved)
     }
   }
 }

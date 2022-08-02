@@ -22,7 +22,4 @@ export default class Status extends BaseModel {
   public static assignUuid(status: Status) {
     status.id = crypto.randomUUID()
   }
-
-  @belongsTo(() => User)
-  public users: BelongsTo<typeof User>
 }
