@@ -10,10 +10,27 @@ import UpdateAdminValidator from 'App/Validators/User/UpdateAdminValidator'
 import UpdateClientValidator from 'App/Validators/User/UpdateClientValidator'
 
 export default class UsersController {
-  public async index({ response }: HttpContextContract) {
-    const users = await User.all()
-    if (users.length === 0) return response.notFound({ message: 'No users found' })
-    return response.ok(users)
+  public async index({ request, response }: HttpContextContract) {
+    const { page, perPage, ...inputs } = request.qs()
+
+    try {
+      if (page || perPage) {
+        const users = await User.query()
+          .preload('roles', (role) => role.select('name', 'description').where('name', 'client'))
+          .filter(inputs)
+          .paginate(page || 1, perPage || 10)
+
+        return response.ok(users)
+      }
+
+      const users = await User.query()
+        .preload('roles', (role) => role.select('name', 'description').where('name', 'client'))
+        .filter(inputs)
+
+      return response.ok(users)
+    } catch (error) {
+      return response.badRequest({ statusCode: 400, message: 'Error fetching users' })
+    }
   }
 
   public async show({ params, response }: HttpContextContract) {
