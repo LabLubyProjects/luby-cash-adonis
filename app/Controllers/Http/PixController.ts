@@ -40,17 +40,17 @@ export default class PixController {
 
   public async store({ request, response, auth }: HttpContextContract) {
     const sourceUserId = auth.user?.id
-    const { targetUserId, amount } = request.only(['targetUserId', 'amount'])
+    const { targetCpfNumber, amount } = request.only(['targetCpfNumber', 'amount'])
 
     if (!(await auth.user?.isClient()))
       return response.forbidden({ message: 'You are not an eligible client' })
 
-    if (sourceUserId === targetUserId)
+    const targetUser = await User.findBy('cpf_number', targetCpfNumber)
+
+    if (sourceUserId === targetUser!.id)
       return response.badRequest({ message: "You can't send money to yourself" })
 
-    const targetUser = await User.find(targetUserId)
-    if (!targetUser) return response.notFound({ message: 'Target user not found' })
-    if (!(await targetUser.isClient()))
+    if (!(await targetUser!.isClient()))
       return response.forbidden({ message: 'Target user is not an eligible client' })
 
     const sourceUserFromMicroServiceResponse = await axios.get(
@@ -66,7 +66,7 @@ export default class PixController {
 
     const transactionResponse = await axios.post(`${Env.get('MS_CLIENTS_BASE_URL')}/transaction`, {
       sourceUserId,
-      targetUserId,
+      targetUserId: targetUser!.id,
       amount,
     })
 
@@ -75,22 +75,22 @@ export default class PixController {
     try {
       await PixTransaction.create({
         sourceUserId,
-        targetUserId,
+        targetUserId: targetUser!.id,
         value: amount,
       })
       await produce(
         {
           sourceUserName: auth.user?.fullName,
           sourceUserEmail: auth.user?.email,
-          targetUserName: targetUser.fullName,
+          targetUserName: targetUser!.fullName,
         },
         'new-pix-sent'
       )
       await produce(
         {
           sourceUserName: auth.user?.fullName,
-          targetUserName: targetUser.fullName,
-          targetUserEmail: targetUser.email,
+          targetUserName: targetUser!.fullName,
+          targetUserEmail: targetUser!.email,
         },
         'new-pix-received'
       )
