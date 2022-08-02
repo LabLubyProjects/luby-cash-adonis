@@ -1,7 +1,6 @@
 import { DateTime } from 'luxon'
-import { BaseModel, beforeCreate, BelongsTo, belongsTo, column } from '@ioc:Adonis/Lucid/Orm'
+import { BaseModel, beforeCreate, column } from '@ioc:Adonis/Lucid/Orm'
 import * as crypto from 'crypto'
-import User from './User'
 
 export default class Status extends BaseModel {
   public static table = 'status'

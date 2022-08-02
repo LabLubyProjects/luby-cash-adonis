@@ -11,11 +11,17 @@ export default class PixTransaction extends compose(BaseModel, Filterable) {
   @column({ isPrimary: true })
   public id: string
 
-  @belongsTo(() => User)
-  public sourceUserId: BelongsTo<typeof User>
+  @column()
+  public sourceUserId: string
+
+  @column()
+  public targetUserId: string
 
   @belongsTo(() => User)
-  public targetUserId: BelongsTo<typeof User>
+  public sourceUser: BelongsTo<typeof User>
+
+  @belongsTo(() => User)
+  public targetUser: BelongsTo<typeof User>
 
   @column()
   public value: number

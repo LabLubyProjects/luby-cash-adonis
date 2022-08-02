@@ -80,7 +80,7 @@ export default class UsersController {
 
     if (userByCpf && (await userByCpf.isDisapproved()))
       return response.badRequest({
-        message: 'Unfortunately you are not eligible to be a client',
+        message: 'Unfortunately you already tried and you are not eligible to be a client',
       })
 
     clientBody.state = clientBody.state.toUpperCase()
