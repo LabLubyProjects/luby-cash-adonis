@@ -49,6 +49,5 @@ export default class UpdateClientValidator extends CustomMessages {
     city: schema.string.optional({ trim: true }, [rules.minLength(2), rules.maxLength(60)]),
     state: schema.string.optional({ trim: true }, [rules.minLength(2), rules.maxLength(2)]),
     zipcode: schema.string.optional({ trim: true }, [rules.regex(/[0-9]{5}-[0-9]{3}/)]),
-    status: schema.string.optional({}, [rules.exists({ table: 'status', column: 'value' })]),
   })
 }

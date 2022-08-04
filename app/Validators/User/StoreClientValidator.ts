@@ -8,7 +8,7 @@ export default class StoreClientValidator extends CustomMessages {
   }
 
   public refs = schema.refs({
-    id: this.ctx.params.id,
+    id: this.ctx.params.id || -1,
   })
 
   public schema = schema.create({
