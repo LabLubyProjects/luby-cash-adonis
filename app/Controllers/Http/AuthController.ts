@@ -13,6 +13,9 @@ export default class AuthController {
 
     const user = await User.query().where({ email }).preload('roles').first()
 
+    if (!(await user?.isAdmin()) && !(await user?.isClient()))
+      return response.unauthorized({ message: 'Access denied' })
+
     try {
       const token = await auth.use('api').attempt(email, password, {
         name: user?.fullName,
@@ -53,7 +56,7 @@ export default class AuthController {
     }
   }
 
-  public async resetPßassword({ request, response }: HttpContextContract) {
+  public async resetPassword({ request, response }: HttpContextContract) {
     await request.validate(ResetPasswordValidator)
 
     const { email, token, newPassword } = request.all()
