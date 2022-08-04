@@ -2,7 +2,7 @@ import type { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
 import User from '../../Models/User'
 import Database from '@ioc:Adonis/Lucid/Database'
 import Role from 'App/Models/Role'
-import { produce } from 'App/Messaging/kafka'
+import { consume, produce } from 'App/Messaging/kafka'
 import StoreAdminValidator from 'App/Validators/User/StoreAdminValidator'
 import StoreClientValidator from 'App/Validators/User/StoreClientValidator'
 import Status from 'App/Models/Status'
@@ -78,7 +78,6 @@ export default class UsersController {
   public async storeClient({ request, response }: HttpContextContract) {
     await request.validate(StoreClientValidator)
     const clientBody = request.only([
-      'id',
       'fullName',
       'cpfNumber',
       'email',
@@ -90,7 +89,7 @@ export default class UsersController {
       'zipcode',
     ])
 
-    const userByCpf = await User.find(clientBody.id)
+    const userByCpf = await User.findBy('cpf_number', clientBody.cpfNumber)
 
     if (userByCpf && (await userByCpf.isClient()))
       return response.unprocessableEntity({ message: 'Already a client' })
@@ -101,23 +100,32 @@ export default class UsersController {
       })
 
     clientBody.state = clientBody.state.toUpperCase()
-    const transaction = await Database.transaction()
 
-    let newClient = new User()
-    try {
-      newClient.useTransaction(transaction)
-      newClient.merge(clientBody)
-      const pendingStatus = await Status.findByOrFail('value', 'pending')
-      await newClient.related('status').associate(pendingStatus)
-      await newClient.save()
-    } catch (error) {
-      await transaction.rollback()
-      return response.badRequest({ message: 'Error creating client' })
+    let newClient
+
+    if (userByCpf && (await userByCpf.isAdmin())) {
+      newClient = userByCpf
+    } else {
+      const transaction = await Database.transaction()
+
+      try {
+        newClient = new User()
+        newClient.useTransaction(transaction)
+        const { fullName, cpfNumber, email, password } = clientBody
+        newClient.fill({ fullName, cpfNumber, email, password })
+        const pendingStatus = await Status.findByOrFail('value', 'pending')
+        await newClient.related('status').associate(pendingStatus)
+        await newClient.save()
+      } catch (error) {
+        await transaction.rollback()
+        return response.badRequest({ message: 'Error creating client' })
+      }
+      await transaction.commit()
     }
 
-    await transaction.commit()
-
-    await produce(clientBody, 'store-client')
+    delete clientBody.password
+    await produce({ id: newClient.id, ...clientBody }, 'store-client')
+    consume(['update-client-status'])
     return response.ok({ message: 'You will receive an email informing about your situation' })
   }
 
@@ -173,7 +181,6 @@ export default class UsersController {
       'city',
       'state',
       'zipcode',
-      'status',
     ])
 
     await produce({ id: clientId, ...clientBody }, 'update-client')
@@ -186,10 +193,6 @@ export default class UsersController {
       updatedClient = await User.find(clientId)
       updatedClient.useTransaction(transaction)
       await updatedClient.merge(clientBody).save()
-      if (clientBody.status) {
-        const status = await Status.findBy('value', clientBody.status)
-        await updatedClient.related('status').associate(status)
-      }
     } catch (error) {
       await transaction.rollback()
       return response.badRequest({ statusCode: 400, message: 'Error updating client' })
