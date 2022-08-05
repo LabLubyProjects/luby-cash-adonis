@@ -6,8 +6,7 @@ import { consume, produce } from 'App/Messaging/kafka'
 import StoreAdminValidator from 'App/Validators/User/StoreAdminValidator'
 import StoreClientValidator from 'App/Validators/User/StoreClientValidator'
 import Status from 'App/Models/Status'
-import UpdateAdminValidator from 'App/Validators/User/UpdateAdminValidator'
-import UpdateClientValidator from 'App/Validators/User/UpdateClientValidator'
+import UpdateUserValidator from 'App/Validators/User/UpdateUserValidator'
 
 export default class UsersController {
   public async index({ request, response }: HttpContextContract) {
@@ -16,18 +15,16 @@ export default class UsersController {
     try {
       if (page || perPage) {
         const users = await User.query()
-          .preload('roles', (role) => role.select('name', 'description').where('name', 'client'))
+          .preload('status')
           .filter(inputs)
           .paginate(page || 1, perPage || 10)
-
-        return response.ok(users)
+        const { meta, data } = users.serialize()
+        const usersToReturn = data.filter((user) => user.status !== null)
+        return response.ok({ meta, data: usersToReturn })
       }
 
-      const users = await User.query()
-        .preload('roles', (role) => role.select('name', 'description').where('name', 'client'))
-        .filter(inputs)
-
-      return response.ok(users)
+      const users = await User.query().preload('status').filter(inputs)
+      return response.ok(users.filter((user) => user.status !== null))
     } catch (error) {
       return response.badRequest({ statusCode: 400, message: 'Error fetching users' })
     }
@@ -53,6 +50,8 @@ export default class UsersController {
       newAdmin.fill(adminBody)
       await newAdmin.save()
       const adminRole = await Role.findByOrFail('name', 'admin')
+      const pendingStatus = await Status.findByOrFail('value', 'pending')
+      await newAdmin.related('status').associate(pendingStatus)
       await newAdmin.related('roles').attach([adminRole.id], transaction)
     } catch (error) {
       await transaction.rollback()
@@ -91,6 +90,9 @@ export default class UsersController {
 
     const userByCpf = await User.findBy('cpf_number', clientBody.cpfNumber)
 
+    if (userByCpf?.email !== clientBody.email)
+      return response.badRequest({ message: 'Inconsistent fields' })
+
     if (userByCpf && (await userByCpf.isClient()))
       return response.unprocessableEntity({ message: 'Already a client' })
 
@@ -101,12 +103,13 @@ export default class UsersController {
 
     clientBody.state = clientBody.state.toUpperCase()
 
-    let newClient
+    let idToProduce
 
     if (userByCpf && (await userByCpf.isAdmin())) {
-      newClient = userByCpf
+      idToProduce = userByCpf.id
     } else {
       const transaction = await Database.transaction()
+      let newClient
 
       try {
         newClient = new User()
@@ -121,57 +124,23 @@ export default class UsersController {
         return response.badRequest({ message: 'Error creating client' })
       }
       await transaction.commit()
+      idToProduce = newClient.id
     }
 
     delete clientBody.password
-    await produce({ id: newClient.id, ...clientBody }, 'store-client')
+    await produce({ id: idToProduce, ...clientBody }, 'store-client')
     consume(['update-client-status'])
     return response.ok({ message: 'You will receive an email informing about your situation' })
   }
 
-  public async updateAdmin({ request, response, params, auth }: HttpContextContract) {
-    await request.validate(UpdateAdminValidator)
-    const adminId = params.id
+  public async update({ request, response, params, auth }: HttpContextContract) {
+    await request.validate(UpdateUserValidator)
+    const userId = params.id
 
-    if (adminId !== auth.user?.id)
-      return response.forbidden({ message: 'You are not allowed to update this admin' })
+    if (userId !== auth.user?.id && !(await auth.user?.isAdmin()))
+      return response.forbidden({ message: 'You are not allowed to update this user' })
 
-    const adminBody = request.only(['fullName', 'cpfNumber', 'email', 'password'])
-    const transaction = await Database.transaction()
-    let updatedAdmin
-    try {
-      updatedAdmin = await User.find(adminId)
-      updatedAdmin.useTransaction(transaction)
-      await updatedAdmin.merge(adminBody).save()
-      if (await updatedAdmin.isClient()) await produce(updatedAdmin, 'update-client')
-    } catch (error) {
-      await transaction.rollback()
-      return response.badRequest({ message: 'Error updating admin' })
-    }
-
-    await transaction.commit()
-
-    let adminFind
-
-    try {
-      adminFind = await User.query()
-        .where('id', updatedAdmin.id)
-        .preload('roles', (rolesQuery) => rolesQuery.select('name', 'description'))
-        .first()
-    } catch (error) {
-      return response.notFound({ message: 'Admin not found' })
-    }
-
-    return response.ok(adminFind)
-  }
-
-  public async updateClient({ request, response, params, auth }: HttpContextContract) {
-    await request.validate(UpdateClientValidator)
-    const clientId = params.id
-    if (clientId !== auth.user?.id && !(await auth.user?.isAdmin()))
-      return response.forbidden({ message: 'You are not allowed to update this client' })
-
-    const clientBody = request.only([
+    const userBody = request.only([
       'fullName',
       'cpfNumber',
       'email',
@@ -183,29 +152,51 @@ export default class UsersController {
       'zipcode',
     ])
 
-    await produce({ id: clientId, ...clientBody }, 'update-client')
-
-    let updatedClient
+    if (userBody.state) userBody.state = userBody.state.toUpperCase()
 
     const transaction = await Database.transaction()
-
+    let updatedUser
     try {
-      updatedClient = await User.find(clientId)
-      updatedClient.useTransaction(transaction)
-      await updatedClient.merge(clientBody).save()
+      updatedUser = await User.find(userId)
+      updatedUser.useTransaction(transaction)
+      const { fullName, cpfNumber, email, password, phone, averageSalary, city, state, zipcode } =
+        userBody
+      await updatedUser.merge({ fullName, cpfNumber, email, password }).save()
+      if (await updatedUser.isClient())
+        await produce(
+          {
+            id: userId,
+            fullName,
+            cpfNumber,
+            email,
+            password,
+            phone,
+            averageSalary,
+            city,
+            state,
+            zipcode,
+          },
+          'update-client'
+        )
     } catch (error) {
       await transaction.rollback()
-      return response.badRequest({ statusCode: 400, message: 'Error updating client' })
-    }
-    await transaction.commit()
-    let clientFind
-    try {
-      clientFind = await User.find(clientId)
-    } catch (error) {
-      return response.notFound({ statusCode: 404, message: 'Error finding client' })
+      return response.badRequest({ message: 'Error updating user' })
     }
 
-    return response.ok(clientFind)
+    await transaction.commit()
+
+    let userFind
+
+    try {
+      userFind = await User.query()
+        .where('id', userId)
+        .preload('roles', (rolesQuery) => rolesQuery.select('name', 'description'))
+        .first()
+    } catch (error) {
+      return response.notFound({ message: 'User not found' })
+    }
+
+    return response.ok(userFind)
   }
 
   public async destroy({ params, response }: HttpContextContract) {

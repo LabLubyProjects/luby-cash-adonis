@@ -2,7 +2,7 @@ import { schema, rules } from '@ioc:Adonis/Core/Validator'
 import type { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
 import CustomMessages from '../CustomMessages'
 
-export default class UpdateAdminValidator extends CustomMessages {
+export default class UpdateUserValidator extends CustomMessages {
   constructor(protected ctx: HttpContextContract) {
     super()
   }
@@ -37,9 +37,17 @@ export default class UpdateAdminValidator extends CustomMessages {
         whereNot: {
           id: this.refs.id,
         },
-        caseInsensitive: true,
       }),
     ]),
     password: schema.string.optional({}, [rules.maxLength(50)]),
+    phone: schema.string.optional({ trim: true }, [
+      rules.mobile({
+        locale: ['pt-BR'],
+      }),
+    ]),
+    averageSalary: schema.number.optional([rules.unsigned()]),
+    city: schema.string.optional({ trim: true }, [rules.minLength(2), rules.maxLength(60)]),
+    state: schema.string.optional({ trim: true }, [rules.minLength(2), rules.maxLength(2)]),
+    zipcode: schema.string.optional({ trim: true }, [rules.regex(/[0-9]{5}-[0-9]{3}/)]),
   })
 }
