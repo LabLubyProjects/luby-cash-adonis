@@ -1,9 +1,10 @@
 import { DateTime } from 'luxon'
-import { BaseModel, BelongsTo, belongsTo, column } from '@ioc:Adonis/Lucid/Orm'
+import { BaseModel, beforeCreate, BelongsTo, belongsTo, column } from '@ioc:Adonis/Lucid/Orm'
 import { compose } from '@ioc:Adonis/Core/Helpers'
 import User from './User'
 import { Filterable } from '@ioc:Adonis/Addons/LucidFilter'
 import PixTransactionFilter from './Filters/PixTransactionFilter'
+import * as crypto from 'crypto'
 
 export default class PixTransaction extends compose(BaseModel, Filterable) {
   public static $filter = () => PixTransactionFilter
@@ -28,4 +29,9 @@ export default class PixTransaction extends compose(BaseModel, Filterable) {
 
   @column.dateTime({ autoCreate: true })
   public createdAt: DateTime
+
+  @beforeCreate()
+  public static assignUuid(pix: PixTransaction) {
+    pix.id = crypto.randomUUID()
+  }
 }

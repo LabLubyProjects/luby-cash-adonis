@@ -17,20 +17,20 @@ export default class PixController {
     try {
       if (page || perPage) {
         const pixTransactions = await PixTransaction.query()
+          .filter(inputs)
           .where('source_user_id', clientId)
           .orWhere('target_user_id', clientId)
           .orderBy('created_at', 'desc')
-          .filter(inputs)
           .paginate(page || 1, perPage || 10)
 
         return response.ok(pixTransactions)
       }
 
       const pixTransactions = await PixTransaction.query()
+        .filter(inputs)
         .where('source_user_id', clientId)
         .orWhere('target_user_id', clientId)
         .orderBy('created_at', 'desc')
-        .filter(inputs)
 
       return response.ok(pixTransactions)
     } catch (error) {
@@ -61,7 +61,7 @@ export default class PixController {
         .status(sourceUserFromMicroServiceResponse.status)
         .json({ message: sourceUserFromMicroServiceResponse.data.message })
 
-    if (sourceUserFromMicroServiceResponse.data.currentBalance < amount)
+    if (Number(sourceUserFromMicroServiceResponse.data.current_balance) < amount)
       return response.badRequest({ message: 'You current balance is lower than the amount' })
 
     const transactionResponse = await axios.post(`${Env.get('MS_CLIENTS_BASE_URL')}/transaction`, {
@@ -69,8 +69,7 @@ export default class PixController {
       targetUserId: targetUser!.id,
       amount,
     })
-
-    if (transactionResponse.status !== 200)
+    if (transactionResponse.status !== 201)
       return response.internalServerError({ message: 'Internal Server Error' })
     try {
       await PixTransaction.create({
@@ -100,11 +99,19 @@ export default class PixController {
     return response.created({ message: 'Transaction performed successfully' })
   }
 
-  public async show({ params, response }: HttpContextContract) {
+  public async show({ params, response, auth }: HttpContextContract) {
     const pixTransactionId = params.id
+
     const pixTransaction = await PixTransaction.find(pixTransactionId)
 
     if (!pixTransaction) return response.notFound({ message: 'Pix transaction not found' })
+
+    if (
+      auth.user?.id !== pixTransaction!.sourceUserId &&
+      auth.user?.id !== pixTransaction!.targetUserId &&
+      !(await auth.user?.isAdmin())
+    )
+      return response.forbidden({ message: 'You are not allowed to view this pix transaction' })
 
     return response.ok(pixTransaction)
   }
