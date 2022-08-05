@@ -39,9 +39,6 @@ export class KafkaSingleton {
   }
 }
 
-// const consumer = kafka.consumer({ groupId: 'api-cash' })
-// const producer = kafka.producer()
-
 function isAlreadySubscribed(topic: string): boolean {
   return subscribedTopics.includes(topic)
 }

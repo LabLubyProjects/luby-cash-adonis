@@ -90,7 +90,7 @@ export default class UsersController {
 
     const userByCpf = await User.findBy('cpf_number', clientBody.cpfNumber)
 
-    if (userByCpf?.email !== clientBody.email)
+    if (userByCpf && userByCpf?.email !== clientBody.email)
       return response.badRequest({ message: 'Inconsistent fields' })
 
     if (userByCpf && (await userByCpf.isClient()))
@@ -105,9 +105,13 @@ export default class UsersController {
 
     let idToProduce
 
+    const userByEmail = await User.findBy('email', clientBody.email)
+
     if (userByCpf && (await userByCpf.isAdmin())) {
       idToProduce = userByCpf.id
-    } else {
+    } else if (userByCpf) return response.unprocessableEntity({ message: 'CPF already exists' })
+    else if (userByEmail) return response.unprocessableEntity({ message: 'Email already exists' })
+    else {
       const transaction = await Database.transaction()
       let newClient
 

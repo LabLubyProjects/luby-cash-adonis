@@ -43,6 +43,7 @@ services:
      - MYSQL_PASSWORD=provams
      - MYSQL_DB_NAME=lubycash
      - KAFKA_CONNECTION=kafka:29092
+     - MS_CLIENTS_BASE_URL=http://clients:4000
     links:
       - database
     networks:
