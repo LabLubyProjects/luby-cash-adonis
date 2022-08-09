@@ -80,6 +80,7 @@ export default class PixController {
       await produce(
         {
           sourceUserName: auth.user?.fullName,
+          value: amount,
           email: auth.user?.email,
           targetUserName: targetUser!.fullName,
         },
@@ -89,6 +90,7 @@ export default class PixController {
         {
           sourceUserName: auth.user?.fullName,
           targetUserName: targetUser!.fullName,
+          value: amount,
           email: targetUser!.email,
         },
         'new-pix-received'
